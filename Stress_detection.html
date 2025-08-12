@@ -42,7 +42,11 @@
                     <label for="sleep-hours-input" class="block text-slate-700 font-semibold mb-2">Hours of Sleep:</label>
                     <input type="number" id="sleep-hours-input" value="8" min="0" max="15" class="w-full p-4 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors">
                 </div>
-                <div class="md:col-span-2">
+                <div>
+                    <label for="working-hours-input" class="block text-slate-700 font-semibold mb-2">Working Hours (per day):</label>
+                    <input type="number" id="working-hours-input" value="8" min="0" max="16" class="w-full p-4 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors">
+                </div>
+                <div>
                     <label for="performance-input" class="block text-slate-700 font-semibold mb-2">Work Performance:</label>
                     <select id="performance-input" class="w-full p-4 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors">
                         <option value="good">Meets/Exceeds Expectations</option>
@@ -80,7 +84,7 @@
         </section>
 
         <section id="history-section" class="mt-8 pt-8 border-t border-slate-200 hidden">
-            <h2 class="text-2xl font-bold text-slate-900 mb-4 text-center">Analysis History & Trends</h2>
+            <h2 class="2xl font-bold text-slate-900 mb-4 text-center">Analysis History & Trends</h2>
             <div class="bg-slate-100 p-4 rounded-lg shadow-inner mb-4 flex flex-col sm:flex-row items-center justify-between">
                 <div class="flex items-center space-x-4 mb-2 sm:mb-0">
                     <p class="text-sm font-medium text-slate-600">Set Custom Thresholds:</p>
@@ -106,6 +110,7 @@
                             <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider">Prediction</th>
                             <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider">HR</th>
                             <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider">Sleep</th>
+                            <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider">Work Hours</th>
                             <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider">Perf.</th>
                         </tr>
                     </thead>
@@ -123,6 +128,7 @@
             const clearButton = document.getElementById('clear-button');
             const heartRateInput = document.getElementById('heart-rate-input');
             const sleepHoursInput = document.getElementById('sleep-hours-input');
+            const workingHoursInput = document.getElementById('working-hours-input');
             const performanceInput = document.getElementById('performance-input');
             const textInput = document.getElementById('text-input');
             const loadingSpinner = document.getElementById('loading-spinner');
@@ -146,13 +152,12 @@
             const defaultMonitoringThreshold = 1.0;
 
             
-            function simulatePrediction(heartRate, sleepHours, performance, text) {
+            function simulatePrediction(heartRate, sleepHours, workingHours, performance, text) {
                 
-                // Check text sentiment first for high priority
                 const lowerText = text.toLowerCase();
                 const stressedKeywords = ['overwhelmed', 'tired', 'stressed', 'anxious', 'pressure', 'difficult', 'stressful', 'burnout', 'falling behind', 'behind', 'not well', 'tried'];
                 const positiveKeywords = ['motivated', 'productive', 'happy', 'great', 'smoothly', 'well', 'excited', 'confident', 'on track', 'alright'];
-                
+
                 let isStressedText = false;
                 for (const keyword of stressedKeywords) {
                     if (lowerText.includes(keyword)) {
@@ -163,7 +168,32 @@
                 
                 if (isStressedText) {
                      let detailMessages = [];
-                     detailMessages.push("Your message contains a stress-related keyword. This is the primary factor in this prediction.");
+                     let contributingFactors = [];
+                     
+                     if (heartRate > 80) {
+                         contributingFactors.push(`Your heart rate is elevated at ${heartRate} bpm.`);
+                     }
+                     if (sleepHours < 8 && sleepHours > 0) {
+                         contributingFactors.push(`Your sleep of ${sleepHours} hours is below the recommended amount.`);
+                     }
+                     if (workingHours > 9) {
+                         contributingFactors.push(`Your working hours of ${workingHours} per day are a key factor.`);
+                     }
+                     if (performance === 'poor') {
+                         contributingFactors.push(`Your work performance is a contributing factor.`);
+                     } else if (performance === 'average') {
+                         contributingFactors.push(`Your work performance shows some strain.`);
+                     }
+
+                     detailMessages.push("Your message contains stress-related keywords. This is the primary factor in this prediction.");
+                     if(contributingFactors.length > 0) {
+                         detailMessages.push("Other factors contributing to this prediction include:");
+                         detailMessages.push(...contributingFactors);
+                     } else {
+                         detailMessages.push("All other metrics seem to be in a normal range, but the model is prioritizing your self-reported feelings.");
+                     }
+
+
                      return { 
                         prediction: "Stressed", 
                         confidence: (Math.random() * 0.15 + 0.85),
@@ -174,7 +204,7 @@
                 }
 
                 
-                if (heartRate === 0 && sleepHours === 0 && performance === 'good' && text.trim() === '') {
+                if (heartRate === 0 && sleepHours === 0 && workingHours === 0 && performance === 'good' && text.trim() === '') {
                     return {
                         prediction: "Perfect Score",
                         confidence: 1.0,
@@ -190,34 +220,48 @@
                 // Feature 1: Heart Rate (Physiological)
                 if (heartRate > 100) {
                     total_score += 2.5;
-                    detailMessages.push("Your heart rate is above 100 bpm, which is a key indicator of high stress.");
+                    detailMessages.push(`Your heart rate is above 100 bpm, which is a key indicator of high stress.`);
                 } else if (heartRate > 90) {
                     total_score += 1.5;
-                    detailMessages.push("Your heart rate is a bit elevated, which may indicate a higher level of stress.");
+                    detailMessages.push(`Your heart rate is elevated at ${heartRate} bpm, which may indicate a higher level of stress.`);
                 } else if (heartRate > 80) {
                     total_score += 0.5;
-                    detailMessages.push("Your heart rate is slightly elevated, but within a healthy range.");
+                    detailMessages.push(`Your heart rate is slightly elevated at ${heartRate} bpm, but within a healthy range.`);
                 }
                 
                 // Feature 2: Sleep Hours (Behavioral)
                 if (sleepHours < 8 && sleepHours > 0) {
                     total_score += 1.0;
-                    detailMessages.push(`Your sleep of ${sleepHours} hours is less than the recommended 8+ hours, which is important for health.`);
-                }
-                if (sleepHours < 6 && sleepHours > 0) {
+                    detailMessages.push(`Your sleep of ${sleepHours} hours is less than the recommended 8+ hours.`);
+                } else if (sleepHours < 6 && sleepHours > 0) {
                     total_score += 1.5;
                     detailMessages.push("Your sleep of less than 6 hours is significantly below the recommended amount.");
+                } else if (sleepHours >= 8) {
+                    detailMessages.push(`Your sleep of ${sleepHours} hours is within the healthy range.`);
+                }
+
+
+                // Feature 3: Working Hours (Contextual)
+                if (workingHours > 9) {
+                    total_score += 1.5;
+                    detailMessages.push(`Your working hours (${workingHours} hours per day) are above the recommended 8-9 hour range.`);
+                } else if (workingHours < 8 && workingHours > 0) {
+                    total_score += 0.5;
+                    detailMessages.push(`Your working hours (${workingHours} hours per day) are below the recommended 8-9 hour range.`);
+                } else if (workingHours >=8 && workingHours <= 9) {
+                    detailMessages.push(`Your working hours (${workingHours} hours per day) are within the recommended range.`);
                 }
                 
-                // Feature 3: Work Performance (Contextual)
+                // Feature 4: Work Performance (Contextual)
                 if (performance === 'poor') {
                     total_score += 1.5;
                     detailMessages.push("Your work performance of 'Needs Improvement' is a key factor in the prediction.");
                 } else if (performance === 'average') {
                     total_score += 0.5;
-                    detailMessages.push("Your work performance of 'Meets Expectations' contributes a small amount to the score.");
+                    detailMessages.push("Your work performance of 'Meets Expectations (but with a lot of effort)' contributes to the score.");
+                } else if (performance === 'good') {
+                    detailMessages.push("Your work performance is currently meeting or exceeding expectations.");
                 }
-
                 
                 let isPositiveText = false;
                 if (text.trim() !== '') {
@@ -229,6 +273,8 @@
                             break;
                         }
                     }
+                } else {
+                    detailMessages.push("No check-in message was provided.");
                 }
 
                 let prediction, confidence, advice;
@@ -249,9 +295,6 @@
                     advice = "Your well-being metrics look great! To maintain this, a consistent sleep schedule can be very beneficial.";
                 }
 
-                if (performance === 'good') {
-                    detailMessages.push("Your work performance is currently meeting or exceeding expectations.");
-                }
 
                 return { prediction, confidence, advice, numericalStressScore: total_score, details: detailMessages };
             }
@@ -357,6 +400,7 @@
                 resultContainer.classList.add('hidden');
                 heartRateInput.value = '70';
                 sleepHoursInput.value = '8';
+                workingHoursInput.value = '8';
                 performanceInput.value = 'good';
                 textInput.value = '';
                 if (historyChart) {
@@ -375,6 +419,7 @@
             analyzeButton.addEventListener('click', () => {
                 const heartRate = parseInt(heartRateInput.value);
                 const sleepHours = parseInt(sleepHoursInput.value);
+                const workingHours = parseInt(workingHoursInput.value);
                 const performance = performanceInput.value;
                 const text = textInput.value.trim();
 
@@ -383,7 +428,7 @@
                 analyzeButton.disabled = true;
 
                 setTimeout(() => {
-                    const { prediction, confidence, advice, numericalStressScore, details } = simulatePrediction(heartRate, sleepHours, performance, text);
+                    const { prediction, confidence, advice, numericalStressScore, details } = simulatePrediction(heartRate, sleepHours, workingHours, performance, text);
 
                     loadingSpinner.classList.add('hidden');
                     analyzeButton.disabled = false;
