@@ -36,7 +36,7 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
                     <label for="heart-rate-input" class="block text-slate-700 font-semibold mb-2">Heart Rate (bpm):</label>
-                    <input type="number" id="heart-rate-input" value="70" min="40" max="150" class="w-full p-4 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors">
+                    <input type="number" id="heart-rate-input" value="70" min="0" max="150" class="w-full p-4 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors">
                 </div>
                 <div>
                     <label for="sleep-hours-input" class="block text-slate-700 font-semibold mb-2">Hours of Sleep:</label>
@@ -71,7 +71,10 @@
                 </div>
                 <div id="advice-message-container" class="flex items-start p-4 rounded-lg">
                     <div id="advice-icon" class="text-2xl mr-4"></div>
-                    <p id="advice-message" class="text-sm text-slate-700"></p>
+                    <div>
+                        <p id="advice-message" class="text-sm text-slate-700"></p>
+                        <ul id="advice-details" class="list-disc list-inside text-sm text-slate-600 mt-2 space-y-1"></ul>
+                    </div>
                 </div>
             </div>
         </section>
@@ -129,6 +132,7 @@
             const adviceMessageContainer = document.getElementById('advice-message-container');
             const adviceIcon = document.getElementById('advice-icon');
             const adviceMessage = document.getElementById('advice-message');
+            const adviceDetailsList = document.getElementById('advice-details');
             const historySection = document.getElementById('history-section');
             const historyTableBody = document.getElementById('history-table-body');
             const historyChartCanvas = document.getElementById('history-chart').getContext('2d');
@@ -143,38 +147,85 @@
 
             
             function simulatePrediction(heartRate, sleepHours, performance, text) {
-                let total_score = 0;
                 
-                
-                if (heartRate > 90) total_score += 2.0;
-                else if (heartRate > 80) total_score += 1.0;
-                
-                
-                if (sleepHours < 6) total_score += 1.5;
-                else if (sleepHours < 7) total_score += 0.5;
-                
-                
-                if (performance === 'poor') total_score += 1.5;
-                else if (performance === 'average') total_score += 0.5;
-                
-                
+                // Check text sentiment first for high priority
                 const lowerText = text.toLowerCase();
-                const stressedKeywords = ['overwhelming', 'anxious', 'pressure', 'difficult', 'stressful', 'burnout', 'falling behind', 'behind'];
-                const positiveKeywords = ['motivated', 'productive', 'happy', 'great', 'smoothly', 'well', 'excited', 'confident', 'on track'];
-
+                const stressedKeywords = ['overwhelmed', 'tired', 'stressed', 'anxious', 'pressure', 'difficult', 'stressful', 'burnout', 'falling behind', 'behind', 'not well', 'tried'];
+                const positiveKeywords = ['motivated', 'productive', 'happy', 'great', 'smoothly', 'well', 'excited', 'confident', 'on track', 'alright'];
+                
                 let isStressedText = false;
                 for (const keyword of stressedKeywords) {
                     if (lowerText.includes(keyword)) {
                         isStressedText = true;
-                        total_score += 1.0;
                         break;
                     }
                 }
                 
-                if (!isStressedText) {
+                if (isStressedText) {
+                     let detailMessages = [];
+                     detailMessages.push("Your message contains a stress-related keyword. This is the primary factor in this prediction.");
+                     return { 
+                        prediction: "Stressed", 
+                        confidence: (Math.random() * 0.15 + 0.85),
+                        advice: "We hear your feelings of stress. Taking a break and talking to someone you trust can be a great first step.",
+                        numericalStressScore: 3.5,
+                        details: detailMessages
+                     };
+                }
+
+                
+                if (heartRate === 0 && sleepHours === 0 && performance === 'good' && text.trim() === '') {
+                    return {
+                        prediction: "Perfect Score",
+                        confidence: 1.0,
+                        advice: "All metrics are perfect! You're in a great place for well-being and productivity.",
+                        numericalStressScore: 0.0,
+                        details: []
+                    };
+                }
+                
+                let total_score = 0;
+                let detailMessages = [];
+
+                // Feature 1: Heart Rate (Physiological)
+                if (heartRate > 100) {
+                    total_score += 2.5;
+                    detailMessages.push("Your heart rate is above 100 bpm, which is a key indicator of high stress.");
+                } else if (heartRate > 90) {
+                    total_score += 1.5;
+                    detailMessages.push("Your heart rate is a bit elevated, which may indicate a higher level of stress.");
+                } else if (heartRate > 80) {
+                    total_score += 0.5;
+                    detailMessages.push("Your heart rate is slightly elevated, but within a healthy range.");
+                }
+                
+                // Feature 2: Sleep Hours (Behavioral)
+                if (sleepHours < 8 && sleepHours > 0) {
+                    total_score += 1.0;
+                    detailMessages.push(`Your sleep of ${sleepHours} hours is less than the recommended 8+ hours, which is important for health.`);
+                }
+                if (sleepHours < 6 && sleepHours > 0) {
+                    total_score += 1.5;
+                    detailMessages.push("Your sleep of less than 6 hours is significantly below the recommended amount.");
+                }
+                
+                // Feature 3: Work Performance (Contextual)
+                if (performance === 'poor') {
+                    total_score += 1.5;
+                    detailMessages.push("Your work performance of 'Needs Improvement' is a key factor in the prediction.");
+                } else if (performance === 'average') {
+                    total_score += 0.5;
+                    detailMessages.push("Your work performance of 'Meets Expectations' contributes a small amount to the score.");
+                }
+
+                
+                let isPositiveText = false;
+                if (text.trim() !== '') {
                     for (const keyword of positiveKeywords) {
                         if (lowerText.includes(keyword)) {
+                            isPositiveText = true;
                             total_score -= 1.0;
+                            detailMessages.push(`Your message contains a positive keyword: '${keyword}'.`);
                             break;
                         }
                     }
@@ -195,10 +246,14 @@
                 } else { 
                     prediction = "Not Stressed";
                     confidence = (Math.random() * 0.15 + 0.85);
-                    advice = "Your well-being metrics look great! Keep up the good work and stay proactive about your health.";
+                    advice = "Your well-being metrics look great! To maintain this, a consistent sleep schedule can be very beneficial.";
                 }
 
-                return { prediction, confidence, advice, numericalStressScore: total_score };
+                if (performance === 'good') {
+                    detailMessages.push("Your work performance is currently meeting or exceeding expectations.");
+                }
+
+                return { prediction, confidence, advice, numericalStressScore: total_score, details: detailMessages };
             }
 
             function renderHistoryChart() {
@@ -215,12 +270,14 @@
                 const backgroundColors = dataPoints.map(score => {
                     if (score >= stressedThreshold) return 'rgba(239, 68, 68, 0.8)';
                     if (score >= monitoringThreshold) return 'rgba(251, 191, 36, 0.8)';
+                    if (score <= 0) return 'rgba(16, 185, 129, 1.0)';
                     return 'rgba(16, 185, 129, 0.8)';
                 });
 
                 const borderColors = dataPoints.map(score => {
                     if (score >= stressedThreshold) return 'rgb(239, 68, 68)';
                     if (score >= monitoringThreshold) return 'rgb(251, 191, 36)';
+                    if (score <= 0) return 'rgb(16, 185, 129)';
                     return 'rgb(16, 185, 129)';
                 });
 
@@ -274,9 +331,16 @@
                     analysisHistory.forEach(entry => {
                         const row = document.createElement('tr');
                         row.className = 'hover:bg-slate-50 transition-colors';
+                        let textColorClass = 'text-emerald-600';
+                        if (entry.prediction === 'Stressed') {
+                            textColorClass = 'text-red-600';
+                        } else if (entry.prediction === 'Needs Monitoring') {
+                            textColorClass = 'text-yellow-600';
+                        }
+                        
                         row.innerHTML = `
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">${entry.time}</td>
-                            <td class="px-6 py-4 whitespace-nowrap font-medium text-sm ${entry.prediction === 'Stressed' ? 'text-red-600' : (entry.prediction === 'Needs Monitoring' ? 'text-yellow-600' : 'text-emerald-600')}">${entry.prediction}</td>
+                            <td class="px-6 py-4 whitespace-nowrap font-medium text-sm ${textColorClass}">${entry.prediction}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">${entry.heartRate}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">${entry.sleepHours}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">${entry.performance}</td>
@@ -319,13 +383,22 @@
                 analyzeButton.disabled = true;
 
                 setTimeout(() => {
-                    const { prediction, confidence, advice, numericalStressScore } = simulatePrediction(heartRate, sleepHours, performance, text);
+                    const { prediction, confidence, advice, numericalStressScore, details } = simulatePrediction(heartRate, sleepHours, performance, text);
 
                     loadingSpinner.classList.add('hidden');
                     analyzeButton.disabled = false;
                     resultContainer.classList.remove('hidden');
                     stressResult.textContent = prediction;
                     adviceMessage.textContent = advice;
+                    
+                    adviceDetailsList.innerHTML = '';
+                    if (details.length > 0) {
+                        details.forEach(item => {
+                            const li = document.createElement('li');
+                            li.textContent = item;
+                            adviceDetailsList.appendChild(li);
+                        });
+                    }
 
                     let bgColorClass = '';
                     let textColorClass = '';
